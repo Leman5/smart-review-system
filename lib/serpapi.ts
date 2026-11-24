@@ -77,13 +77,19 @@ export function parseReviews(raw: SerpReview[]): Review[] {
 }
 
 /** Newest-first pages are read until a review older than `days` shows up. */
-export async function fetchRecentReviews(placeId: string, days: number, now: Date = new Date()): Promise<Review[]> {
+export async function fetchRecentReviews(
+  placeId: string,
+  days: number,
+  keyword: string | null = null,
+  now: Date = new Date(),
+): Promise<Review[]> {
   const cutoff = cutoffDate(days, now).getTime();
   const collected: Review[] = [];
   let token: string | undefined;
 
   for (let page = 0; page < MAX_REVIEW_PAGES; page++) {
     const params: Record<string, string> = { engine: "google_maps_reviews", data_id: placeId, sort_by: "newestFirst" };
+    if (keyword) params.query = keyword;
     if (token) {
       params.next_page_token = token;
       params.num = "20";

@@ -5,6 +5,7 @@ import { windowRating } from "../lib/rating";
 import type { Place, Review } from "../lib/types";
 
 const WINDOWS = [7, 30, 90] as const;
+const MAX_DAYS = 365;
 
 type Coords = { lat: number; lng: number } | null;
 
@@ -30,6 +31,9 @@ export default function Home() {
   const [days, setDays] = useState<number>(30);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [fetchedDays, setFetchedDays] = useState(0);
+  const [keyword, setKeyword] = useState("");
+  const [keywordInput, setKeywordInput] = useState("");
+  const [daysInput, setDaysInput] = useState("30");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,11 +59,11 @@ export default function Home() {
     }
   }, [query]);
 
-  const loadReviews = useCallback(async (place: Place, window: number) => {
+  const loadReviews = useCallback(async (place: Place, window: number, kw: string) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reviews?id=${encodeURIComponent(place.id)}&days=${window}`);
+      const res = await fetch(`/api/reviews?id=${encodeURIComponent(place.id)}&days=${window}${kw ? `&q=${encodeURIComponent(kw)}` : ""}`);
       const body = await res.json();
       if (!res.ok) throw new Error(body.error);
       setReviews(body.reviews);
@@ -75,12 +79,29 @@ export default function Home() {
     setSelected(place);
     setReviews([]);
     setFetchedDays(0);
-    void loadReviews(place, days);
+    setKeyword("");
+    setKeywordInput("");
+    void loadReviews(place, days, "");
   };
 
   const pickWindow = (window: number) => {
     setDays(window);
-    if (selected && window > fetchedDays) void loadReviews(selected, window);
+    setDaysInput(String(window));
+    if (selected && window > fetchedDays) void loadReviews(selected, window, keyword);
+  };
+
+  const applyCustomDays = () => {
+    const n = Number(daysInput);
+    if (Number.isInteger(n) && n >= 1 && n <= MAX_DAYS) pickWindow(n);
+    else setError(`Enter a whole number of days from 1 to ${MAX_DAYS}`);
+  };
+
+  const applyKeyword = () => {
+    if (!selected) return;
+    const kw = keywordInput.trim();
+    setKeyword(kw);
+    setFetchedDays(0);
+    void loadReviews(selected, days, kw);
   };
 
   const now = useMemo(() => new Date(), [reviews]);
@@ -101,6 +122,14 @@ export default function Home() {
             </button>
           ))}
         </div>
+        <form className="inline" onSubmit={(e) => { e.preventDefault(); applyCustomDays(); }}>
+          <input type="number" inputMode="numeric" min={1} max={MAX_DAYS} value={daysInput} onChange={(e) => setDaysInput(e.target.value)} aria-label="Number of days" />
+          <button className="chip" type="submit">Days</button>
+        </form>
+        <form className="inline" onSubmit={(e) => { e.preventDefault(); applyKeyword(); }}>
+          <input value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} placeholder="Dish or keyword, e.g. biryani" aria-label="Keyword" />
+          <button className="chip" type="submit">Find</button>
+        </form>
         <div className="compare">
           <div>
             <div className="muted">Overall</div>
@@ -108,12 +137,15 @@ export default function Home() {
             <div className="muted">{selected.reviewCount ?? "?"} reviews</div>
           </div>
           <div>
-            <div className="muted">Last {days} days</div>
+            <div className="muted">Last {days} days{keyword ? ` · “${keyword}”` : ""}</div>
             <div className={`big ${dropped ? "bad" : ""}`}>{loading ? "…" : <Stars value={recent.average} />}</div>
             <div className="muted">{loading ? "" : `${recent.count} reviews`}</div>
           </div>
         </div>
         {error && <p className="bad">{error}</p>}
+        {!loading && !error && fetchedDays > 0 && recent.count === 0 && (
+          <p className="muted">No reviews{keyword ? ` mentioning “${keyword}”` : ""} in the last {days} days.</p>
+        )}
         {!loading && recent.count > 0 && recent.count < 5 && (
           <p className="muted">Only {recent.count} recent reviews, so this number can swing a lot.</p>
         )}
