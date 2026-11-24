@@ -59,11 +59,11 @@ export default function Home() {
     }
   }, [query]);
 
-  const loadReviews = useCallback(async (place: Place, window: number, kw: string) => {
+  const loadReviews = useCallback(async (place: Place, window: number, kw: string, refresh = false) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reviews?id=${encodeURIComponent(place.id)}&days=${window}${kw ? `&q=${encodeURIComponent(kw)}` : ""}`);
+      const res = await fetch(`/api/reviews?id=${encodeURIComponent(place.id)}&days=${window}${kw ? `&q=${encodeURIComponent(kw)}` : ""}${refresh ? "&refresh=1" : ""}`);
       const body = await res.json();
       if (!res.ok) throw new Error(body.error);
       setReviews(body.reviews);
@@ -125,6 +125,7 @@ export default function Home() {
         <form className="inline" onSubmit={(e) => { e.preventDefault(); applyCustomDays(); }}>
           <input type="number" inputMode="numeric" min={1} max={MAX_DAYS} value={daysInput} onChange={(e) => setDaysInput(e.target.value)} aria-label="Number of days" />
           <button className="chip" type="submit">Days</button>
+          <button className="chip" type="button" onClick={() => void loadReviews(selected, days, keyword, true)}>Refresh</button>
         </form>
         <form className="inline" onSubmit={(e) => { e.preventDefault(); applyKeyword(); }}>
           <input value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} placeholder="Dish or keyword, e.g. biryani" aria-label="Keyword" />

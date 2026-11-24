@@ -17,6 +17,7 @@ type SerpLocalResult = {
 };
 
 type SerpReview = {
+  review_id?: string;
   rating?: number;
   iso_date?: string;
   snippet?: string;
@@ -38,7 +39,7 @@ function apiKey(): string {
 async function serpGet<T>(params: Record<string, string>): Promise<T> {
   const url = new URL(BASE);
   for (const [k, v] of Object.entries({ ...params, api_key: apiKey() })) url.searchParams.set(k, v);
-  const res = await fetch(url, { next: { revalidate: SIX_HOURS } });
+  const res = await fetch(url, params.engine === "google_maps_reviews" ? { cache: "no-store" } : { next: { revalidate: SIX_HOURS } });
   if (!res.ok) throw new Error(`SerpApi request failed: ${res.status}`);
   return (await res.json()) as T;
 }
@@ -69,6 +70,7 @@ export function parseReviews(raw: SerpReview[]): Review[] {
   return raw
     .filter((r) => typeof r.rating === "number" && r.iso_date)
     .map((r) => ({
+      id: r.review_id ?? `${r.iso_date}|${r.user?.name ?? ""}|${(r.snippet ?? "").slice(0, 40)}`,
       rating: r.rating as number,
       date: r.iso_date as string,
       text: r.snippet ?? null,
@@ -76,14 +78,14 @@ export function parseReviews(raw: SerpReview[]): Review[] {
     }));
 }
 
-/** Newest-first pages are read until a review older than `days` shows up. */
-export async function fetchRecentReviews(
+export type FetchedReviews = { reviews: Review[]; complete: boolean };
+
+/** Reads newest-first pages until `stop` says the latest page was enough. `complete` means Google had no more pages. */
+export async function fetchReviewPages(
   placeId: string,
-  days: number,
+  stop: (batch: Review[]) => boolean,
   keyword: string | null = null,
-  now: Date = new Date(),
-): Promise<Review[]> {
-  const cutoff = cutoffDate(days, now).getTime();
+): Promise<FetchedReviews> {
   const collected: Review[] = [];
   let token: string | undefined;
 
@@ -99,10 +101,16 @@ export async function fetchRecentReviews(
 
     const batch = parseReviews(data.reviews ?? []);
     collected.push(...batch);
+    if (stop(batch)) return { reviews: collected, complete: false };
 
-    const reachedOlder = batch.some((r) => new Date(r.date).getTime() < cutoff);
     token = data.serpapi_pagination?.next_page_token;
-    if (reachedOlder || !token) break;
+    if (!token) return { reviews: collected, complete: true };
   }
-  return collected;
+  return { reviews: collected, complete: false };
+}
+
+export async function fetchRecentReviews(placeId: string, days: number, keyword: string | null = null, now: Date = new Date()): Promise<Review[]> {
+  const cutoff = cutoffDate(days, now).getTime();
+  const { reviews } = await fetchReviewPages(placeId, (batch) => batch.some((r) => new Date(r.date).getTime() < cutoff), keyword);
+  return reviews;
 }

@@ -16,7 +16,13 @@ Import the repo in [Vercel](https://vercel.com) (Hobby plan) and add `SERPAPI_KE
 
 - Search uses SerpApi's Google Maps engine, so results match Google Maps.
 - Reviews are read newest-first until one is older than the chosen window, then the stars are averaged.
-- Responses are cached for 6 hours to save the free quota. Each page of reviews costs one SerpApi search.
+- Search results are cached for 6 hours. Each page of reviews costs one SerpApi search.
+- With a Redis database connected, every place's reviews are saved and reused. Later visits only fetch reviews newer than the saved ones (checked at most every 12 hours, or on Refresh). Keyword search runs on the saved reviews.
+- Without a database the app still works, but every lookup uses SerpApi searches.
+
+## Saving reviews (optional, free)
+
+In Vercel, open **Storage**, add **Upstash Redis**, and connect it to the project. Vercel sets the connection variables (`KV_REST_API_URL` and `KV_REST_API_TOKEN`, or `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`). Redeploy afterwards.
 
 ## Commands
 

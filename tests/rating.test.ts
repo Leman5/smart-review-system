@@ -4,7 +4,7 @@ import { parseReviews } from "../lib/serpapi";
 import type { Review } from "../lib/types";
 
 const now = new Date("2026-11-24T00:00:00Z");
-const review = (rating: number, date: string): Review => ({ rating, date, text: null, author: null });
+const review = (rating: number, date: string, id = date): Review => ({ id, rating, date, text: null, author: null });
 
 describe("windowRating", () => {
   const reviews = [review(1, "2026-11-20T00:00:00Z"), review(2, "2026-11-01T00:00:00Z"), review(5, "2026-06-01T00:00:00Z")];

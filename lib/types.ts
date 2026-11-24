@@ -9,6 +9,7 @@ export type Place = {
 };
 
 export type Review = {
+  id: string;
   rating: number;
   date: string;
   text: string | null;
